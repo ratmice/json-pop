@@ -1,0 +1,33 @@
+[package]
+name = "json-pop"
+version = "0.0.1"
+authors = ["matt rice <ratmice@gmail.com>"]
+edition = "2018"
+description = "A small JSON parser from parser/lexer generators."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ratmice/json-pop"
+
+[dependencies]
+logos = "0.10.0-rc5"
+logos-derive = "0.10.0-rc5"
+lalrpop-util = "0.18"
+lexical = "5.2"
+codespan-reporting = {version = "0.9.2", optional = true}
+
+[build-dependencies]
+lalrpop = "0.18"
+
+[dev-dependencies]
+clap = "2.33.0"
+structopt = { version = "0.3", features = [ "paw" ] }
+structopt-derive = "0.4"
+paw = "1.0"
+anyhow = "1.0"
+cfg-if = "0.1"
+
+[[example]]
+name = "json-pop"
+
+[features]
+default = []
+pretty_errors = ["codespan-reporting"]

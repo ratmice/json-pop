@@ -1,0 +1,80 @@
+use crate::lex;
+use lex::wrap::Wrap;
+use crate::value;
+use std::result::Result;
+use crate::parser::ParseError;
+
+grammar<'source>;
+
+extern {
+  type Location = usize;
+  type Error = lex::wrap::Error;
+  enum Wrap<'source> {
+    "true"  => Wrap::Token{tok: lex::Token::True, string: <&'source str>},
+    "false" => Wrap::Token{tok: lex::Token::False, string: <&'source str>},
+    "null"  => Wrap::Token{tok: lex::Token::Null, string: <&'source str>},
+    ","	    => Wrap::Token{tok: lex::Token::Comma, string: <&'source str>},
+    ":"	    => Wrap::Token{tok: lex::Token::Colon, string: <&'source str>},
+    "{"	    => Wrap::Token{tok: lex::Token::LBrace, string: <&'source str>},
+    "}"	    => Wrap::Token{tok: lex::Token::RBrace, string: <&'source str>},
+    "["	    => Wrap::Token{tok: lex::Token::LBrack, string: <&'source str>},
+    "]"	    => Wrap::Token{tok: lex::Token::RBrack, string: <&'source str>},
+    string  => Wrap::Token{tok: lex::Token::String, string: <&'source str>},
+    number  => Wrap::Token{tok: lex::Token::Number, string: <&'source str>},
+  }
+}
+
+pub json = value;
+
+value: value::Value<'source> = {
+   "true"      =>? Ok(value::Value::<'source>::Bool(true)),
+   "false"     =>? Ok(value::Value::<'source>::Bool(false)),
+   "null"      =>? Ok(value::Value::<'source>::Null),
+   <a: array>  =>? Ok(value::Value::<'source>::Array(a)),
+   <o: object> =>? Ok(value::Value::<'source>::Object(o)),
+   <l:@L> <n: number> <r:@R> =>? {
+	let result = lexical::parse(n.as_bytes());
+	match result {
+	   Ok(n) => Ok(value::Value::Number(n)),
+	   Err(_e) => Err(ParseError::User{
+		error: lex::wrap::Error::NumericalError{range:l..r},
+	   })
+	}
+   },
+   <l:@L> <s: string> <r:@R> =>? {
+	// Ok(value::Value::String(s))
+	let utf8_result = std::str::from_utf8(s.as_bytes());
+	match utf8_result {
+	  Ok(utf8_valid) => Ok(value::Value::String(utf8_valid)),
+	  Err(_e) => Err(ParseError::User{
+		error: lex::wrap::Error::Utf8Error{range:l..r},
+	  }),
+	}
+   }
+};
+
+// FIXME accepts trailing commas.
+object: Vec<(&'source str, value::Value<'source>)> = {
+  "{" <objs:(<string> ":" <value> ",")*>
+    <key_val_opt: (<string> ":" <value>)?> "}"
+	 =>? match key_val_opt {
+		None => Ok(objs),
+		Some(key_val) => {
+	  	   let mut objs = objs;
+		   objs.push(key_val);
+		   Ok(objs)
+		}
+	}
+};
+
+// FIXME accepts trailing commas.
+array: Vec<value::Value<'source>> = {
+ "[" <vals:(<value> ",")*> <val_opt:value?> "]" =>? match val_opt {
+        None => Ok(vals),
+        Some(val) => {
+            let mut vals = vals;
+            vals.push(val);
+            Ok(vals)
+        }
+    }
+};
