@@ -72,3 +72,12 @@ pub fn parse_str<'a>(
 pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> std::io::Result<()> {
     write!(w, "{}", *v)
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test() -> std::result::Result<(), anyhow::Error> {
+        let _ = crate::parse_str("�")?;
+        Ok(())
+    }
+}
