@@ -49,7 +49,7 @@ value: value::Value<'source> = {
 // No trailing comma.
 CommaSep<T>: Vec<T> = {
   <es: CommaSep<T>> "," <e: T> => {let mut es = es; es.push(e); es },
-  <e: T?> => match e { Some(e) => vec![e], None => vec![], },
+  <e: T> => vec![e],
 }
 
 object: (&'source str, value::Value<'source>) = {
@@ -58,8 +58,10 @@ object: (&'source str, value::Value<'source>) = {
 
 objects: Vec<(&'source str, value::Value<'source>)> = {
   "{" <es: CommaSep<object>> "}" => es,
+  "{" "}" => vec![],
 }
 
 array: Vec<value::Value<'source>> = {
   "[" <a: CommaSep<value>> "]" => a,
+  "[" "]" => vec![],
 }
