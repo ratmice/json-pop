@@ -31,13 +31,13 @@ pub mod value {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 Value::Number(float) => write!(f, "{}", lexical::to_string(*float)),
-                Value::String(string) => write!(f, "{}", string),
+                Value::String(string) => write!(f, "\"{}\"", string),
                 Value::Object(obj) => {
                     write!(f, "{{")?;
                     if let Some(((key, value), rest)) = obj.split_first() {
-                        write!(f, "{} : {}", key, value)?;
+                        write!(f, "\"{}\": {}", key, value)?;
                         for (key, value) in rest.iter() {
-                            write!(f, ", {}: {}", key, value)?
+                            write!(f, ", \"{}\": {}", key, value)?
                         }
                     }
                     write!(f, "}}")

@@ -19,12 +19,20 @@ extern {
     "}"	    => Wrap::Token{tok: lex::Token::RBrace, string: <&'source str>},
     "["	    => Wrap::Token{tok: lex::Token::LBrack, string: <&'source str>},
     "]"	    => Wrap::Token{tok: lex::Token::RBrack, string: <&'source str>},
-    string  => Wrap::Token{tok: lex::Token::String, string: <&'source str>},
+    "\""  => Wrap::Token{tok: lex::Token::Quote, string: <&'source str>},
+    string => Wrap::Token{tok: lex::Token::String, string: <&'source str>},
     number  => Wrap::Token{tok: lex::Token::Number, string: <&'source str>},
   }
 }
 
 pub json = value;
+
+quoted_string: &'source str = {
+   // So we've got an empty string,
+   // We need to return a string of the appropriate lifetime.
+   <umm: "\""> "\"" => &umm[umm.len()..],
+   "\"" <s: string> "\"" => s,
+}
 
 value: value::Value<'source> = {
    "true"      =>? Ok(value::Value::<'source>::Bool(true)),
@@ -41,9 +49,7 @@ value: value::Value<'source> = {
 	   })
 	}
    },
-   <l:@L> <s: string> <r:@R> =>? {
-	 Ok(value::Value::String(s))
-   }
+   quoted_string =>? Ok(value::Value::<'source>::String(<>)),
 };
 
 // No trailing comma.
@@ -53,7 +59,7 @@ CommaSep<T>: Vec<T> = {
 }
 
 object: (&'source str, value::Value<'source>) = {
-  <s:string> ":" <v:value> => (s,v),
+  <s:quoted_string> ":" <v:value> => (s,v),
 }
 
 objects: Vec<(&'source str, value::Value<'source>)> = {

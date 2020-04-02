@@ -1,6 +1,21 @@
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
+pub enum Quoted {
+    #[end]
+    End,
+
+    #[error]
+    Error,
+
+    #[token = "\""]
+    QuoteEnd,
+
+    #[regex = r#"([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))+"#]
+    String,
+}
+
+#[derive(Logos, Debug, PartialEq, Copy, Clone)]
 #[logos(trivia = r"[\p{Whitespace}]+")]
 pub enum Token {
     // Logos requires that we define two default variants,
@@ -38,6 +53,9 @@ pub enum Token {
     #[token = "]"]
     RBrack,
 
+    #[token = "\""]
+    Quote,
+
     /* The last 2 could use some cleaning up,
        In particular matching Number as a regex... turning it into a string,
        and then doing an entire pass over the string, rather than converting
@@ -46,11 +64,12 @@ pub enum Token {
     #[regex = r"-?([0-9]|([1-9][0-9]*))((\.[0-9]+)?)([eE][+-]?[0-9]+)?"]
     Number,
 
-    #[regex = r#""([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))*""#]
     String,
 }
 
 pub mod wrap {
+    use super::Quoted;
+    use super::Token;
     use crate::lex;
     use logos::Logos;
     use std::fmt;
@@ -70,8 +89,13 @@ pub mod wrap {
         }
     }
 
+    enum Mode<'source> {
+        Quote(Box<logos::Lexer<lex::Quoted, &'source str>>),
+        Top(Box<logos::Lexer<lex::Token, &'source str>>),
+    }
+
     pub struct Tokens<'source> {
-        logos: logos::Lexer<lex::Token, &'source str>,
+        mode: Mode<'source>,
     }
 
     pub type Spanned<Tok, Loc, E> = Result<(Loc, Tok, Loc), E>;
@@ -91,8 +115,8 @@ pub mod wrap {
 
     impl<'source> Tokens<'source> {
         pub fn new(source: &'source str) -> Tokens {
-            let logos = lex::Token::lexer(source);
-            Tokens { logos }
+            let mode = Mode::Top(Box::new(lex::Token::lexer(source)));
+            Tokens { mode }
         }
     }
 
@@ -100,14 +124,62 @@ pub mod wrap {
         type Item = Spanned<Wrap<'source>, usize, Error>;
 
         fn next(&mut self) -> Option<Spanned<self::Wrap<'source>, usize, Error>> {
-            let range = self.logos.range();
-            let tok = self.logos.token;
-            let string = self.logos.slice();
-            if tok == lex::Token::End {
-                return None;
+            match &mut self.mode {
+                Mode::Top(lex) => {
+                    let range = lex.range();
+                    let tok = lex.token;
+                    let string = lex.slice();
+                    if tok == lex::Token::End {
+                        return None;
+                    }
+                    match tok {
+                        Token::Quote => {
+                            self.mode =
+                                Mode::Quote(Box::new(lex.to_owned().advance_as::<Quoted>()));
+                            Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
+                        }
+                        _ => {
+                            lex.advance();
+                            Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
+                        }
+                    }
+                }
+                Mode::Quote(lex) => {
+                    let range = lex.range();
+                    let tok = lex.token;
+                    let string = lex.slice();
+                    if tok == lex::Quoted::End {
+                        return None;
+                    }
+                    match tok {
+                        Quoted::Error => {
+                            let tok = Wrap::Token {
+                                tok: Token::Error,
+                                string,
+                            };
+                            lex.advance();
+                            Some(Ok((range.start, tok, range.end)))
+                        }
+                        Quoted::End => None,
+                        Quoted::QuoteEnd => {
+                            let tok = Wrap::Token {
+                                tok: Token::Quote,
+                                string,
+                            };
+                            self.mode = Mode::Top(Box::new(lex.to_owned().advance_as()));
+                            Some(Ok((range.start, tok, range.end)))
+                        }
+                        Quoted::String => {
+                            let tok = Wrap::Token {
+                                tok: Token::String,
+                                string,
+                            };
+                            lex.advance();
+                            Some(Ok((range.start, tok, range.end)))
+                        }
+                    }
+                }
             }
-            self.logos.advance();
-            Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
         }
     }
 }
