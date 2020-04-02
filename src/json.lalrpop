@@ -31,7 +31,7 @@ value: value::Value<'source> = {
    "false"     =>? Ok(value::Value::<'source>::Bool(false)),
    "null"      =>? Ok(value::Value::<'source>::Null),
    <a: array>  =>? Ok(value::Value::<'source>::Array(a)),
-   <o: object> =>? Ok(value::Value::<'source>::Object(o)),
+   <o: objects> =>? Ok(value::Value::<'source>::Object(o)),
    <l:@L> <n: number> <r:@R> =>? {
 	let result = lexical::parse(n.as_bytes());
 	match result {
@@ -53,28 +53,20 @@ value: value::Value<'source> = {
    }
 };
 
-// FIXME accepts trailing commas.
-object: Vec<(&'source str, value::Value<'source>)> = {
-  "{" <objs:(<string> ":" <value> ",")*>
-    <key_val_opt: (<string> ":" <value>)?> "}"
-	 =>? match key_val_opt {
-		None => Ok(objs),
-		Some(key_val) => {
-	  	   let mut objs = objs;
-		   objs.push(key_val);
-		   Ok(objs)
-		}
-	}
-};
+// No trailing comma.
+CommaSep<T>: Vec<T> = {
+  <es: CommaSep<T>> "," <e: T> => {let mut es = es; es.push(e); es },
+  <e: T?> => match e { Some(e) => vec![e], None => vec![], },
+}
 
-// FIXME accepts trailing commas.
+object: (&'source str, value::Value<'source>) = {
+  <s:string> ":" <v:value> => (s,v),
+}
+
+objects: Vec<(&'source str, value::Value<'source>)> = {
+  "{" <es: CommaSep<object>> "}" => es,
+}
+
 array: Vec<value::Value<'source>> = {
- "[" <vals:(<value> ",")*> <val_opt:value?> "]" =>? match val_opt {
-        None => Ok(vals),
-        Some(val) => {
-            let mut vals = vals;
-            vals.push(val);
-            Ok(vals)
-        }
-    }
-};
+  "[" <a: CommaSep<value>> "]" => a,
+}
