@@ -49,7 +49,6 @@ pub fn from_parse_error<'a>(
         User { error } => {
             let range = match error {
                 lex::wrap::Error::LexicalError { range } => range,
-                lex::wrap::Error::Utf8Error { range } => range,
                 lex::wrap::Error::NumericalError { range } => range,
             };
 

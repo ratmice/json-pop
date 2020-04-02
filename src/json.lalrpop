@@ -42,14 +42,7 @@ value: value::Value<'source> = {
 	}
    },
    <l:@L> <s: string> <r:@R> =>? {
-	// Ok(value::Value::String(s))
-	let utf8_result = std::str::from_utf8(s.as_bytes());
-	match utf8_result {
-	  Ok(utf8_valid) => Ok(value::Value::String(utf8_valid)),
-	  Err(_e) => Err(ParseError::User{
-		error: lex::wrap::Error::Utf8Error{range:l..r},
-	  }),
-	}
+	 Ok(value::Value::String(s))
    }
 };
 

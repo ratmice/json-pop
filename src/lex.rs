@@ -73,18 +73,17 @@ pub mod wrap {
     pub struct Tokens<'source> {
         logos: logos::Lexer<lex::Token, &'source str>,
     }
+
     pub type Spanned<Tok, Loc, E> = Result<(Loc, Tok, Loc), E>;
     #[derive(Debug)]
     pub enum Error {
         LexicalError { range: Range<usize> },
-        Utf8Error { range: Range<usize> },
         NumericalError { range: Range<usize> },
     }
     impl<'source> fmt::Display for Error {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
                 Error::LexicalError { range: _ } => write!(f, "Lexical error"),
-                Error::Utf8Error { range: _ } => write!(f, "Invalid utf8"),
                 Error::NumericalError { range: _ } => write!(f, "Numerical conversion error"),
             }
         }
