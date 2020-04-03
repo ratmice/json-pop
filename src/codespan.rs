@@ -16,7 +16,11 @@ pub fn from_parse_error<'a>(
     let file_id = files.add(filename, data);
     let join_expected = |expected: &Vec<String>| -> String {
         if let Some((caboose, rest)) = expected.split_last() {
-            format!("Expected: {} or {}", rest.join(", "), &caboose)
+            if rest.is_empty() {
+                format!("Expected: {}", &caboose)
+            } else {
+                format!("Expected: {} or {}", rest.join(", "), &caboose)
+            }
         } else {
             // If this error occurs we need to test for it at the caller.
             "Had great expectations?".to_string()
