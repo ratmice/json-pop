@@ -90,8 +90,8 @@ pub mod wrap {
     }
 
     enum Mode<'source> {
-        Quote(Box<logos::Lexer<lex::Quoted, &'source str>>),
-        Top(Box<logos::Lexer<lex::Token, &'source str>>),
+        Quote(logos::Lexer<lex::Quoted, &'source str>),
+        Top(logos::Lexer<lex::Token, &'source str>),
     }
 
     pub struct Tokens<'source> {
@@ -115,7 +115,7 @@ pub mod wrap {
 
     impl<'source> Tokens<'source> {
         pub fn new(source: &'source str) -> Tokens {
-            let mode = Mode::Top(Box::new(lex::Token::lexer(source)));
+            let mode = Mode::Top(lex::Token::lexer(source));
             Tokens { mode }
         }
     }
@@ -135,7 +135,7 @@ pub mod wrap {
                     match tok {
                         Token::Quote => {
                             self.mode =
-                                Mode::Quote(Box::new(lex.to_owned().advance_as::<Quoted>()));
+                                Mode::Quote(lex.to_owned().advance_as::<Quoted>());
                             Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
                         }
                         _ => {
@@ -166,7 +166,7 @@ pub mod wrap {
                                 tok: Token::Quote,
                                 string,
                             };
-                            self.mode = Mode::Top(Box::new(lex.to_owned().advance_as()));
+                            self.mode = Mode::Top(lex.to_owned().advance_as());
                             Some(Ok((range.start, tok, range.end)))
                         }
                         Quoted::String => {
