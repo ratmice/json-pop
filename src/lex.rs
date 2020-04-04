@@ -26,6 +26,11 @@ pub enum Token {
     #[error]
     Error,
 
+    #[token = "\""]
+    Quote,
+
+    String,
+
     #[token = "true"]
     True,
 
@@ -53,9 +58,6 @@ pub enum Token {
     #[token = "]"]
     RBrack,
 
-    #[token = "\""]
-    Quote,
-
     /* The last 2 could use some cleaning up,
        In particular matching Number as a regex... turning it into a string,
        and then doing an entire pass over the string, rather than converting
@@ -63,8 +65,17 @@ pub enum Token {
     */
     #[regex = r"-?([0-9]|([1-9][0-9]*))((\.[0-9]+)?)([eE][+-]?[0-9]+)?"]
     Number,
+}
 
-    String,
+impl Into<Token> for Quoted {
+    fn into(self) -> Token {
+        match self {
+            Self::End => Token::End,
+            Self::QuoteEnd => Token::Quote,
+            Self::String => Token::String,
+            Self::Error => Token::Error,
+        }
+    }
 }
 
 pub mod wrap {
@@ -123,61 +134,57 @@ pub mod wrap {
     impl<'source> Iterator for Tokens<'source> {
         type Item = Spanned<Wrap<'source>, usize, Error>;
 
-        fn next(&mut self) -> Option<Spanned<self::Wrap<'source>, usize, Error>> {
+        // The general reason we need a lexer mode is that:
+        // a) we want to tell the parser about the start and end quote tokens, so that it can point to them
+        // in error messages should one be missing,
+        // to do that we must leave the quote symbols separate from the String regex.
+        // b) once we've taken them out of the String regex, they inner string part
+        // will clash with all the other Token regexes.
+        //
+        // A possibly better way to do this is have a stack of tokens in wrap::Tokens,
+        // which next drains first before lex.advance().
+        //
+        // we can do this in constant space since we just need 2 extra calls to next to drain it.
+        // that would reduce this to a single branch, and token type,
+        // as well as get rid of having to move the lex mode, since there will only be one.
+        //
+        // Anyhow that is worth a try.
+
+        fn next(&mut self) -> Option<Self::Item> {
             match &mut self.mode {
                 Mode::Top(lex) => {
                     let range = lex.range();
-                    let tok = lex.token;
-                    let string = lex.slice();
-                    if tok == lex::Token::End {
-                        return None;
-                    }
-                    match tok {
+                    let wrapped = Wrap::Token {
+                        tok: lex.token,
+                        string: lex.slice(),
+                    };
+                    let ret: Option<Self::Item> = Some(Ok((range.start, wrapped, range.end)));
+
+                    match lex.token {
+                        lex::Token::End => return None,
                         Token::Quote => {
-                            self.mode =
-                                Mode::Quote(lex.to_owned().advance_as::<Quoted>());
-                            Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
+                            self.mode = Mode::Quote(lex.to_owned().advance_as::<Quoted>())
                         }
-                        _ => {
-                            lex.advance();
-                            Some(Ok((range.start, Wrap::Token { tok, string }, range.end)))
-                        }
+                        _ => lex.advance(),
                     }
+                    ret
                 }
                 Mode::Quote(lex) => {
                     let range = lex.range();
-                    let tok = lex.token;
-                    let string = lex.slice();
-                    if tok == lex::Quoted::End {
-                        return None;
+                    let result = Some(Ok((
+                        range.start,
+                        Wrap::Token {
+                            tok: lex.token.into(),
+                            string: lex.slice(),
+                        },
+                        range.end,
+                    )));
+                    match lex.token {
+                        lex::Quoted::End => return None,
+                        lex::Quoted::QuoteEnd => self.mode = Mode::Top(lex.to_owned().advance_as()),
+                        _ => lex.advance(),
                     }
-                    match tok {
-                        Quoted::Error => {
-                            let tok = Wrap::Token {
-                                tok: Token::Error,
-                                string,
-                            };
-                            lex.advance();
-                            Some(Ok((range.start, tok, range.end)))
-                        }
-                        Quoted::End => None,
-                        Quoted::QuoteEnd => {
-                            let tok = Wrap::Token {
-                                tok: Token::Quote,
-                                string,
-                            };
-                            self.mode = Mode::Top(lex.to_owned().advance_as());
-                            Some(Ok((range.start, tok, range.end)))
-                        }
-                        Quoted::String => {
-                            let tok = Wrap::Token {
-                                tok: Token::String,
-                                string,
-                            };
-                            lex.advance();
-                            Some(Ok((range.start, tok, range.end)))
-                        }
-                    }
+                    result
                 }
             }
         }
