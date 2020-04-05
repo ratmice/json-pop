@@ -1,6 +1,7 @@
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
+#[logos(trivia = "[\0]")]
 pub enum Quoted {
     #[end]
     End,
@@ -16,7 +17,7 @@ pub enum Quoted {
 }
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
-#[logos(trivia = r"[\p{Whitespace}]+")]
+#[logos(trivia = "[ \r\n\t]+")]
 pub enum Token {
     // Logos requires that we define two default variants,
     // one for end of input source,
