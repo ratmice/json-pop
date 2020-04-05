@@ -31,12 +31,12 @@ value: value::Value<'source> = {
    "null"      =>? Ok(value::Value::<'source>::Null),
    <a: array>  =>? Ok(value::Value::<'source>::Array(a)),
    <o: objects> =>? Ok(value::Value::<'source>::Object(o)),
-   <l:@L> <n: number> <r:@R> =>? {
+   <l:@L> <n: number> =>? {
 	let result = lexical::parse(n.as_bytes());
 	match result {
 	   Ok(n) => Ok(value::Value::Number(n)),
 	   Err(_e) => Err(ParseError::User{
-		error: lex::wrap::Error::NumericalError{range:l..r},
+		error: lex::wrap::Error::NumericalError{pos:l},
 	   })
 	}
    },

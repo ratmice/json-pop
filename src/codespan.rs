@@ -51,14 +51,14 @@ pub fn from_parse_error<'a>(
             .with_labels(vec![Label::primary(file_id, *start..*end)])
             .with_message("Extra token"),
         User { error } => {
-            let range = match error {
-                lex::wrap::Error::LexicalError { range } => range,
-                lex::wrap::Error::NumericalError { range } => range,
+            let pos = match error {
+                lex::wrap::Error::LexicalError { pos } => pos,
+                lex::wrap::Error::NumericalError { pos } => pos,
             };
 
             Diagnostic::error()
                 .with_message(format!("{}", error))
-                .with_labels(vec![Label::primary(file_id, range.clone())])
+                .with_labels(vec![Label::primary(file_id, pos..pos)])
         }
     };
     (files, diag)

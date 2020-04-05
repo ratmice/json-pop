@@ -58,22 +58,21 @@ pub mod wrap {
     use crate::lex;
     use logos::Logos;
     use std::fmt;
-    use std::ops::Range;
 
     pub struct Tokens<'source>{lex: logos::Lexer<'source, lex::Token<'source>>}
     pub type Spanned<Tok, Loc, E> = Result<(Loc, Tok, Loc), E>;
 
     #[derive(Debug)]
     pub enum Error {
-        LexicalError { range: Range<usize> },
-        NumericalError { range: Range<usize> },
+        LexicalError { pos: usize },
+        NumericalError { pos: usize },
     }
 
     impl<'source> fmt::Display for Error {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
-                Error::LexicalError { range: _ } => write!(f, "Lexical error"),
-                Error::NumericalError { range: _ } => write!(f, "Numerical conversion error"),
+                Error::LexicalError { pos: _ } => write!(f, "Lexical error"),
+                Error::NumericalError { pos: _ } => write!(f, "Numerical conversion error"),
             }
         }
     }
@@ -91,7 +90,7 @@ pub mod wrap {
              self.lex.next().map(|tok| {
                 let range = self.lex.range();
                 if tok == Token::Error {
-                    Err(Error::LexicalError {range: range })
+                    Err(Error::LexicalError {pos: range.start })
                 } else {
                     Ok((range.start, tok, range.end))
                 }
