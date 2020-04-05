@@ -9,7 +9,7 @@ pub mod parser {
     lalrpop_mod!(pub json);
     pub use json::*;
     pub type ParseError<'a> =
-        lalrpop_util::ParseError<usize, crate::lex::wrap::Wrap<'a>, crate::lex::wrap::Error>;
+        lalrpop_util::ParseError<usize, crate::lex::Token::<'a>, crate::lex::wrap::Error>;
 }
 pub use lalrpop_util;
 
@@ -63,7 +63,7 @@ pub fn parse_str<'a>(
     bytes: &'a str,
 ) -> std::result::Result<
     value::Value<'a>,
-    lalrpop_util::ParseError<usize, lex::wrap::Wrap<'a>, lex::wrap::Error>,
+    lalrpop_util::ParseError<usize, lex::Token<'a>, lex::wrap::Error>,
 > {
     let lexer = lex::wrap::Tokens::new(bytes);
     parser::jsonParser::new().parse(lexer)

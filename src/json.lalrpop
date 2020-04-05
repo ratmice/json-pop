@@ -1,5 +1,4 @@
 use crate::lex;
-use lex::wrap::Wrap;
 use crate::value;
 use std::result::Result;
 use crate::parser::ParseError;
@@ -9,30 +8,22 @@ grammar<'source>;
 extern {
   type Location = usize;
   type Error = lex::wrap::Error;
-  enum Wrap<'source> {
-    "true"  => Wrap::Token{tok: lex::Token::True, string: <&'source str>},
-    "false" => Wrap::Token{tok: lex::Token::False, string: <&'source str>},
-    "null"  => Wrap::Token{tok: lex::Token::Null, string: <&'source str>},
-    ","	    => Wrap::Token{tok: lex::Token::Comma, string: <&'source str>},
-    ":"	    => Wrap::Token{tok: lex::Token::Colon, string: <&'source str>},
-    "{"	    => Wrap::Token{tok: lex::Token::LBrace, string: <&'source str>},
-    "}"	    => Wrap::Token{tok: lex::Token::RBrace, string: <&'source str>},
-    "["	    => Wrap::Token{tok: lex::Token::LBrack, string: <&'source str>},
-    "]"	    => Wrap::Token{tok: lex::Token::RBrack, string: <&'source str>},
-    "\""  => Wrap::Token{tok: lex::Token::Quote, string: <&'source str>},
-    string => Wrap::Token{tok: lex::Token::String, string: <&'source str>},
-    number  => Wrap::Token{tok: lex::Token::Number, string: <&'source str>},
+  enum lex::Token<'source> {
+    "true"  => lex::Token::True,
+    "false" => lex::Token::False,
+    "null"  => lex::Token::Null,
+    ","	    => lex::Token::Comma,
+    ":"	    => lex::Token::Colon,
+    "{"	    => lex::Token::LBrace,
+    "}"	    => lex::Token::RBrace,
+    "["	    => lex::Token::LBrack,
+    "]"	    => lex::Token::RBrack,
+    string => lex::Token::String(<&'source str>),
+    number  => lex::Token::Number(<&'source str>),
   }
 }
 
 pub json = value;
-
-quoted_string: &'source str = {
-   // So we've got an empty string,
-   // We need to return a string of the appropriate lifetime.
-   <umm: "\""> "\"" => &umm[umm.len()..],
-   "\"" <s: string> "\"" => s,
-}
 
 value: value::Value<'source> = {
    "true"      =>? Ok(value::Value::<'source>::Bool(true)),
@@ -49,7 +40,7 @@ value: value::Value<'source> = {
 	   })
 	}
    },
-   quoted_string =>? Ok(value::Value::<'source>::String(<>)),
+   string =>? Ok(value::Value::<'source>::String(<>)),
 };
 
 // No trailing comma.
@@ -59,7 +50,7 @@ CommaSep<T>: Vec<T> = {
 }
 
 object: (&'source str, value::Value<'source>) = {
-  <s:quoted_string> ":" <v:value> => (s,v),
+  <s:string> ":" <v:value> => (s,v),
 }
 
 objects: Vec<(&'source str, value::Value<'source>)> = {
