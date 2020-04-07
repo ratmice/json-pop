@@ -52,8 +52,8 @@ pub fn from_parse_error<'a>(
             .with_message("Extra token"),
         User { error } => {
             let pos = match error {
-                lex::wrap::Error::LexicalError { pos } => pos,
-                lex::wrap::Error::NumericalError { pos } => pos,
+                CompilationError::LexicalError { pos } => pos,
+                CompilationError::NumericalError { pos } => pos,
             };
 
             Diagnostic::error()

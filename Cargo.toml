@@ -8,9 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/ratmice/json-pop"
 
 [dependencies]
-# logos = "0.10.0"
-logos = { git="https://github.com/maciejhirsz/logos.git", branch = "smarter-callbacks" } 
-logos-derive = { git="https://github.com/maciejhirsz/logos.git", branch = "smarter-callbacks" } 
+logos = "0.11.0-rc2"
 lalrpop-util = "0.18"
 lexical = "5.2"
 codespan-reporting = {version = "0.9.2", optional = true}

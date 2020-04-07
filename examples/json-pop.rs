@@ -7,7 +7,8 @@ cfg_if::cfg_if! {
   }
 }
 
-use json_pop::lex::wrap::Tokens;
+use json_pop::lex::Token;
+use logos::Logos;
 use json_pop::parser::jsonParser as parser;
 use json_pop::value;
 
@@ -65,7 +66,7 @@ fn parse_stdin() -> anyhow::Result<()> {
     let mut handle = stdin.lock();
 
     handle.read_to_string(&mut buffer)?;
-    let tokens = Tokens::new(&buffer);
+    let tokens = Token::lexer(&buffer).spanned().map(Token::to_lalr_triple);
     let parsed = parser::new().parse(tokens);
     display_value_or_error(&buffer, parsed)
 }
@@ -77,8 +78,7 @@ fn parse_stdin_line() -> anyhow::Result<()> {
     let reader = io::BufReader::new(io::stdin());
     for input_line in reader.lines() {
         let input_line = input_line?;
-        // This is going to get the line number wrong,
-        let tokens = Tokens::new(&input_line.as_str());
+        let tokens = Token::lexer(&input_line.as_str()).spanned().map(Token::to_lalr_triple);
         let parsed = parser::new().parse(tokens);
         if let Some(_) = display_value_or_error(&input_line, parsed).ok() {
             continue;
@@ -92,7 +92,7 @@ fn lex_stdin_lalr() -> anyhow::Result<()> {
     let reader = io::BufReader::new(io::stdin());
     for line in reader.lines() {
         let line = line?;
-        let tokens = Tokens::new(line.as_str());
+        let tokens = Token::lexer(line.as_str());
         for tok in tokens {
             println!("{:?}", tok);
         }

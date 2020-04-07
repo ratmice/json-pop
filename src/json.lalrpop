@@ -1,13 +1,14 @@
 use crate::lex;
+use crate::CompilationError;
 use crate::value;
-use std::result::Result;
 use crate::parser::ParseError;
+use std::result::Result;
 
 grammar<'source>;
 
 extern {
   type Location = usize;
-  type Error = lex::wrap::Error;
+  type Error = CompilationError;
   enum lex::Token<'source> {
     "true"  => lex::Token::True,
     "false" => lex::Token::False,
@@ -36,7 +37,7 @@ value: value::Value<'source> = {
 	match result {
 	   Ok(n) => Ok(value::Value::Number(n)),
 	   Err(_e) => Err(ParseError::User{
-		error: lex::wrap::Error::NumericalError{pos:l},
+		error: CompilationError::NumericalError{pos:l},
 	   })
 	}
    },

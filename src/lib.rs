@@ -1,17 +1,26 @@
 #[cfg(feature = "pretty_errors")]
 pub mod codespan;
 pub mod lex;
+use logos::Logos;
+use crate::lex::Token;
 
 pub mod parser {
     #![allow(clippy::all)]
-
     use lalrpop_util::lalrpop_mod;
     lalrpop_mod!(pub json);
     pub use json::*;
+    use super::*;
+
     pub type ParseError<'a> =
-        lalrpop_util::ParseError<usize, crate::lex::Token::<'a>, crate::lex::wrap::Error>;
+        lalrpop_util::ParseError<usize, Token<'a>, super::CompilationError>;
 }
 pub use lalrpop_util;
+
+#[derive(Debug)]
+pub enum CompilationError {
+    LexicalError { pos: usize },
+    NumericalError { pos: usize },
+}
 
 pub mod value {
     use lexical;
@@ -63,9 +72,9 @@ pub fn parse_str<'a>(
     bytes: &'a str,
 ) -> std::result::Result<
     value::Value<'a>,
-    lalrpop_util::ParseError<usize, lex::Token<'a>, lex::wrap::Error>,
+    lalrpop_util::ParseError<usize, Token<'a>, CompilationError>,
 > {
-    let lexer = lex::wrap::Tokens::new(bytes);
+    let lexer = Token::lexer(bytes).spanned().map(Token::to_lalr_triple);
     parser::jsonParser::new().parse(lexer)
 }
 
@@ -77,7 +86,7 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
 mod test {
     #[test]
     fn test() -> std::result::Result<(), anyhow::Error> {
-        let _ = crate::parse_str("�")?;
+        let _ = parse_str("�")?;
         Ok(())
     }
 }

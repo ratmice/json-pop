@@ -1,13 +1,10 @@
-use logos_derive::Logos;
+use logos::Logos;
+use crate::CompilationError;
+use std::ops::Range;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 #[logos(trivia = "[ \r\n\t]+")]
 pub enum Token<'a> {
-    // Logos requires that we define two default variants,
-    // one for end of input source,
-    #[end]
-    End,
-
     #[error]
     Error,
 
@@ -52,49 +49,10 @@ pub enum Token<'a> {
     #[regex(r#""([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))*""#, |lex| lex.slice())]
     String(&'a str),
 }
-
-pub mod wrap {
-    use super::Token;
-    use crate::lex;
-    use logos::Logos;
-    use std::fmt;
-
-    pub struct Tokens<'source>{lex: logos::Lexer<'source, lex::Token<'source>>}
-    pub type Spanned<Tok, Loc, E> = Result<(Loc, Tok, Loc), E>;
-
-    #[derive(Debug)]
-    pub enum Error {
-        LexicalError { pos: usize },
-        NumericalError { pos: usize },
-    }
-
-    impl<'source> fmt::Display for Error {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match self {
-                Error::LexicalError { pos: _ } => write!(f, "Lexical error"),
-                Error::NumericalError { pos: _ } => write!(f, "Numerical conversion error"),
-            }
-        }
-    }
-
-    impl<'source> Tokens<'source> {
-        pub fn new(source: &'source str) -> Tokens {
-            let lex = lex::Token::lexer(source);
-            Tokens { lex }
-        }
-    }
-
-    impl<'source> Iterator for Tokens<'source> {
-        type Item = Spanned<Token<'source>, usize, Error>;
-        fn next(&mut self) -> Option<Self::Item> {
-             self.lex.next().map(|tok| {
-                let range = self.lex.range();
-                if tok == Token::Error {
-                    Err(Error::LexicalError {pos: range.start })
-                } else {
-                    Ok((range.start, tok, range.end))
-                }
-             })
-        }
-    }
+impl<'a> Token<'a> {
+pub fn to_lalr_triple((t, r) : (Token<'a>, Range<usize>)) -> Result<(usize, Token, usize), CompilationError> {
+  if t == Token::Error {
+    Err(CompilationError::LexicalError{pos: r.start})
+  } else { Ok((r.start, t, r.end)) }
+}
 }
