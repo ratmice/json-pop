@@ -1,18 +1,18 @@
 #[cfg(feature = "pretty_errors")]
 pub mod codespan;
 pub mod lex;
-use logos::Logos;
 use crate::lex::Token;
+use logos::Logos;
+use std::fmt;
 
 pub mod parser {
     #![allow(clippy::all)]
     use lalrpop_util::lalrpop_mod;
     lalrpop_mod!(pub json);
-    pub use json::*;
     use super::*;
+    pub use json::*;
 
-    pub type ParseError<'a> =
-        lalrpop_util::ParseError<usize, Token<'a>, super::CompilationError>;
+    pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, super::CompilationError>;
 }
 pub use lalrpop_util;
 
@@ -20,6 +20,12 @@ pub use lalrpop_util;
 pub enum CompilationError {
     LexicalError { pos: usize },
     NumericalError { pos: usize },
+}
+
+impl fmt::Display for CompilationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#?}", self)
+    }
 }
 
 pub mod value {
@@ -82,11 +88,47 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
     write!(w, "{}", *v)
 }
 
+pub fn maybe_show_error<'a>(
+    _source: &str,
+    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
+) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
+    use cfg_if::cfg_if;
+    cfg_if! {
+        if #[cfg(feature = "pretty_errors")] {
+          codespan::maybe_show_error(_source, parsed)
+        } else {
+          if parsed.is_err() == false {
+              eprintln!("{:#?}", parsed);
+          }
+              parsed
+        }
+    }
+}
+
+pub fn show_error_test<'a>(
+    _source: &str,
+    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
+) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
+    use cfg_if::cfg_if;
+    cfg_if! {
+        if #[cfg(feature = "pretty_errors")] {
+          codespan::show_error_test(_source, parsed)
+        } else {
+          if parsed.is_err() == false {
+              eprintln!("{:#?}", parsed);
+          }
+              parsed
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use super::*;
     #[test]
-    fn test() -> std::result::Result<(), anyhow::Error> {
-        let _ = parse_str("�")?;
-        Ok(())
+    fn test() {
+        let source = "�";
+        let parsed = show_error_test(source, parse_str(source));
+        assert_eq!(parsed.is_err(), true);
     }
 }

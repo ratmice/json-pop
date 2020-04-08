@@ -1,5 +1,6 @@
-use logos::Logos;
 use crate::CompilationError;
+use logos::Logos;
+use std::fmt;
 use std::ops::Range;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
@@ -50,9 +51,19 @@ pub enum Token<'a> {
     String(&'a str),
 }
 impl<'a> Token<'a> {
-pub fn to_lalr_triple((t, r) : (Token<'a>, Range<usize>)) -> Result<(usize, Token, usize), CompilationError> {
-  if t == Token::Error {
-    Err(CompilationError::LexicalError{pos: r.start})
-  } else { Ok((r.start, t, r.end)) }
+    pub fn to_lalr_triple(
+        (t, r): (Token<'a>, Range<usize>),
+    ) -> Result<(usize, Token, usize), CompilationError> {
+        if t == Token::Error {
+            Err(CompilationError::LexicalError { pos: r.start })
+        } else {
+            Ok((r.start, t, r.end))
+        }
+    }
 }
+
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#?}", self)
+    }
 }

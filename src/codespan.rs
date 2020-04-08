@@ -1,9 +1,12 @@
 #![cfg(feature = "pretty_errors")]
 
-use crate::lex;
 use crate::parser::ParseError;
+use crate::value;
+use crate::CompilationError;
 use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
 pub fn from_parse_error<'a>(
     filename: &'a str,
@@ -57,9 +60,56 @@ pub fn from_parse_error<'a>(
             };
 
             Diagnostic::error()
-                .with_message(format!("{}", error))
-                .with_labels(vec![Label::primary(file_id, pos..pos)])
+                .with_message(format!("{:?}", error))
+                .with_labels(vec![Label::primary(file_id, *pos..*pos)])
         }
     };
     (files, diag)
+}
+
+pub fn maybe_show_error<'a>(
+    _source: &str,
+    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
+) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
+    if let Err(error) = parsed {
+        let writer = StandardStream::stderr(ColorChoice::Auto);
+        let config = codespan_reporting::term::Config::default();
+        let (files, diagnostic) = crate::codespan::from_parse_error("stdin", &_source, &error);
+        // Swalling this error is fairly awkward.
+        // We should really wrap the parse error in an IO error with source.
+        // and return an IO error.
+        //
+        // however in that case, what do we return if IO succeeds? sigh
+        assert_eq!(
+            term::emit(&mut writer.lock(), &config, &files, &diagnostic).is_err(),
+            false
+        );
+        Err(error)
+    } else {
+        parsed
+    }
+}
+pub fn show_error_test<'a>(
+    _source: &str,
+    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
+) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
+    if let Err(error) = parsed {
+        let mut writer = codespan_reporting::term::termcolor::Buffer::no_color();
+        let config = codespan_reporting::term::Config::default();
+        let (files, diagnostic) = crate::codespan::from_parse_error("stdin", &_source, &error);
+        assert_eq!(
+            term::emit(&mut writer, &config, &files, &diagnostic).is_err(),
+            false,
+        );
+        // We want the output to be captured by cargo test.
+        // This one doesn't seem to be captured.
+        // let _ = std::io::stderr().write_all(writer.as_slice());
+        // Nor does
+        // let writer = StandardStream::stderr(ColorChoice::Auto);
+        // The following works.
+        eprintln!("{}", std::str::from_utf8(writer.as_slice()).unwrap());
+        Err(error)
+    } else {
+        parsed
+    }
 }

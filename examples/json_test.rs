@@ -1,8 +1,8 @@
 // In the style of: https://github.com/nst/JSONTestSuite
 
 use json_pop::lex::Token;
-use logos::Logos;
 use json_pop::parser::jsonParser as parser;
+use logos::Logos;
 use std::io::Read;
 
 fn main() -> anyhow::Result<()> {

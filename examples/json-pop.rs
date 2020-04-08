@@ -8,9 +8,9 @@ cfg_if::cfg_if! {
 }
 
 use json_pop::lex::Token;
-use logos::Logos;
 use json_pop::parser::jsonParser as parser;
 use json_pop::value;
+use logos::Logos;
 
 use std::io;
 use std::io::BufRead;
@@ -78,7 +78,9 @@ fn parse_stdin_line() -> anyhow::Result<()> {
     let reader = io::BufReader::new(io::stdin());
     for input_line in reader.lines() {
         let input_line = input_line?;
-        let tokens = Token::lexer(&input_line.as_str()).spanned().map(Token::to_lalr_triple);
+        let tokens = Token::lexer(&input_line.as_str())
+            .spanned()
+            .map(Token::to_lalr_triple);
         let parsed = parser::new().parse(tokens);
         if let Some(_) = display_value_or_error(&input_line, parsed).ok() {
             continue;
