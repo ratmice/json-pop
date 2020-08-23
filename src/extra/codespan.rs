@@ -74,7 +74,7 @@ pub fn maybe_show_error<'a>(
     if let Err(error) = parsed {
         let writer = StandardStream::stderr(ColorChoice::Auto);
         let config = codespan_reporting::term::Config::default();
-        let (files, diagnostic) = crate::codespan::from_parse_error("stdin", &_source, &error);
+        let (files, diagnostic) = from_parse_error("stdin", &_source, &error);
         term::emit(&mut writer.lock(), &config, &files, &diagnostic)?;
         Err(crate::error::JsonPopError::Parse(error))
     } else {

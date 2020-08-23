@@ -2,7 +2,7 @@ pub use self::source::*;
 
 mod source {
     #[cfg(feature = "pretty_errors")]
-    use crate::codespan;
+    use crate::extra::codespan;
     use crate::{error, lex, parser, value};
 
     use logos::Logos as _;

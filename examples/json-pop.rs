@@ -114,7 +114,7 @@ fn display_value_or_error(
                    let opts = Opts::from_args();
                    let writer = StandardStream::stderr(opts.color.into());
                    let config = codespan_reporting::term::Config::default();
-                   let (files, diagnostic) = json_pop::codespan::from_parse_error("stdin", &_source, &error);
+                   let (files, diagnostic) = json_pop::extra::codespan::from_parse_error("stdin", &_source, &error);
                   term::emit(&mut writer.lock(), &config, &files, &diagnostic)?;
               } else {
                   use std::io::Write;

@@ -1,8 +1,8 @@
 #[cfg(test)]
-use crate::{error, parser, source, source::Parsable as _, value};
+use crate::{error, parser, extra::source, extra::source::Parsable as _, value};
 
 #[cfg(not(test))]
-use crate::never;
+use crate::extra::never;
 
 #[derive(Debug)]
 #[cfg(test)]
@@ -71,7 +71,7 @@ impl<'a> source::ErrorHandling<'a> for Test<'a> {
             let mut writer = codespan_reporting::term::termcolor::Buffer::no_color();
             let config = codespan_reporting::term::Config::default();
             let (files, diagnostic) =
-                crate::codespan::from_parse_error("stdin", self.source(), &error);
+                crate::extra::codespan::from_parse_error("stdin", self.source(), &error);
 
             let () = codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic)?;
             eprint!("{}", std::str::from_utf8(writer.as_slice()).unwrap());

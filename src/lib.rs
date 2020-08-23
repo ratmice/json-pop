@@ -1,10 +1,6 @@
-#[cfg(feature = "pretty_errors")]
-pub mod codespan;
+pub mod extra;
 pub mod error;
 pub mod lex;
-mod never;
-pub mod source;
-mod test_utils;
 
 use crate::error::CompilationError;
 use crate::lex::Token;
@@ -88,9 +84,10 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::source::ErrorHandling as _;
-    use crate::source::Parsable as _;
-    use test_utils::Test;
+    use crate::extra::source;
+    use source::ErrorHandling as _;
+    use source::Parsable as _;
+    use crate::extra::test_utils::Test;
 
     #[test]
     fn test_invalid() -> Result<(), error::TopLevelError> {
