@@ -108,11 +108,11 @@ mod test {
         // The lifetimes here are kind of annoying in that we need to
         // let bind these rather than just place them right in the array...
         let empty_array = crate::value::Value::Array([].to_vec());
-        let string_value = crate::value::Value::String("foo");
+        let string_value = crate::value::Value::String("foo bar");
         let empty_string = crate::value::Value::String("");
         let sources = [
             ("[]", empty_array),
-            (r#""foo""#, string_value),
+            (r#""foo bar""#, string_value),
             (r#""""#, empty_string),
         ];
         let tests = sources
