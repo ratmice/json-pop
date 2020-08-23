@@ -2,13 +2,22 @@ use crate::parser;
 use std::fmt;
 use std::ops::Range;
 
+/// This is the error type returned by the parser.
+/// It's bounded by the lifetime of the source string
+/// which was parsed
 #[derive(Debug)]
 pub enum JsonPopError<'a> {
     Parse(crate::parser::ParseError<'a>),
     Io(std::io::Error),
+    /// This type is a never variation unless the testsuite is being run.
     TestError(crate::test_utils::TestError<'a>),
 }
 
+/// A top level error returned by processes or tests..
+/// It's not bounded by the lifetime of the program
+/// we should add error codes to these.
+///
+/// That will be a breaking change.
 #[derive(Debug)]
 pub enum TopLevelError {
     TestingError,
@@ -29,6 +38,8 @@ impl<'a> From<JsonPopError<'a>> for TopLevelError {
     }
 }
 
+// This error lives inside the the parsers Error type.
+// So it's a sub-error of a parse error.
 #[derive(Debug)]
 pub enum CompilationError {
     LexicalError { range: Range<usize> },
