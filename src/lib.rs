@@ -1,9 +1,74 @@
 #[cfg(feature = "pretty_errors")]
 pub mod codespan;
+pub mod error;
 pub mod lex;
+pub mod never;
+pub mod test_utils;
+
+use crate::error::CompilationError;
 use crate::lex::Token;
+
 use logos::Logos;
-use std::fmt;
+pub mod source {
+    use super::*;
+    #[derive(Debug)]
+    pub struct Source<'a>(&'a str);
+
+    pub trait Parsable<'a> {
+        fn parse(&'a self) -> parser::Parsed<'a>;
+        fn source(&'a self) -> &Source<'a>;
+    }
+
+    impl<'a> Parsable<'a> for Source<'a> {
+        fn parse(&self) -> parser::Parsed {
+            let lexer = Token::lexer(self.0).spanned().map(Token::to_lalr_triple);
+            parser::Parsed(parser::jsonParser::new().parse(lexer))
+        }
+
+        fn source(&self) -> &Source<'a> {
+            self
+        }
+    }
+
+    pub trait ErrorHandling<'a> {
+        fn handle_errors(
+            &'a self,
+            parsed: parser::Parsed<'a>,
+        ) -> Result<value::Value<'a>, error::JsonPopError<'a>>;
+    }
+
+    impl<'a> ErrorHandling<'a> for Source<'a> {
+        fn handle_errors(
+            &'a self,
+            parsed: parser::Parsed<'a>,
+        ) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
+            use cfg_if::cfg_if;
+            cfg_if! {
+                if #[cfg(feature = "pretty_errors")] {
+                    codespan::maybe_show_error(self.0, parsed.0)
+                } else {
+                  use std::io::Write;
+                  if parsed.0.is_err() == false {
+                      write!(std::io::stderr(), "{:#?}", self.0)?;
+                  }
+                  Ok(parsed.0?)
+               }
+            }
+        }
+    }
+
+    impl<'a, T: AsRef<str> + 'a> From<&'a T> for Source<'a> {
+        fn from(it: &'a T) -> Source<'a> {
+            Source(it.as_ref())
+        }
+    }
+
+    impl<'a> AsRef<str> for Source<'a> {
+        fn as_ref(&self) -> &str {
+            &self.0
+        }
+    }
+}
 
 pub mod parser {
     #![allow(clippy::all)]
@@ -12,27 +77,18 @@ pub mod parser {
     use super::*;
     pub use json::*;
 
-    pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, super::CompilationError>;
+    pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, CompilationError>;
+    pub type ParseResult<'a> = Result<value::Value<'a>, ParseError<'a>>;
+    #[derive(Debug)]
+    pub struct Parsed<'a>(pub ParseResult<'a>);
 }
 pub use lalrpop_util;
-
-#[derive(Debug)]
-pub enum CompilationError {
-    LexicalError { pos: usize },
-    NumericalError { pos: usize },
-}
-
-impl fmt::Display for CompilationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#?}", self)
-    }
-}
 
 pub mod value {
     use lexical;
     use std::fmt;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Value<'a> {
         Number(f64),
         String(&'a str),
@@ -88,47 +144,48 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
     write!(w, "{}", *v)
 }
 
-pub fn maybe_show_error<'a>(
-    _source: &str,
-    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
-) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
-    use cfg_if::cfg_if;
-    cfg_if! {
-        if #[cfg(feature = "pretty_errors")] {
-          codespan::maybe_show_error(_source, parsed)
-        } else {
-          if parsed.is_err() == false {
-              eprintln!("{:#?}", parsed);
-          }
-              parsed
-        }
-    }
-}
-
-pub fn show_error_test<'a>(
-    _source: &str,
-    parsed: Result<value::Value<'a>, crate::parser::ParseError<'a>>,
-) -> Result<value::Value<'a>, crate::parser::ParseError<'a>> {
-    use cfg_if::cfg_if;
-    cfg_if! {
-        if #[cfg(feature = "pretty_errors")] {
-          codespan::show_error_test(_source, parsed)
-        } else {
-          if parsed.is_err() == false {
-              eprintln!("{:#?}", parsed);
-          }
-              parsed
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::source::ErrorHandling as _;
+    use crate::source::Parsable as _;
+    use test_utils::Test;
+
     #[test]
-    fn test() {
-        let source = "�";
-        let parsed = show_error_test(source, parse_str(source));
-        assert_eq!(parsed.is_err(), true);
+    fn test_invalid() -> Result<(), error::TopLevelError> {
+        let sources = ["�", r#""string with missing end quote"#]
+            .iter()
+            .map(|src| Test::TestInvalid(src.into()));
+        Ok(for test in sources {
+            assert_eq!(
+                test.handle_errors(test.parse())
+                    .map_err(|e| error::TopLevelError::from(e))?,
+                crate::value::Value::Null
+            );
+        })
+    }
+
+    #[test]
+    fn test_valid() -> Result<(), error::TopLevelError> {
+        // The lifetimes here are kind of annoying in that we need to
+        // let bind these rather than just place them right in the array...
+        let empty_array = crate::value::Value::Array([].to_vec());
+        let string_value = crate::value::Value::String("foo");
+        let empty_string = crate::value::Value::String("");
+        let sources = [
+            ("[]", empty_array),
+            (r#""foo""#, string_value),
+            (r#""""#, empty_string),
+        ];
+        let tests = sources
+            .iter()
+            .map(|(src, result)| (Test::TestValid(src.into()), result));
+        Ok(for (test, result) in tests {
+            assert_eq!(
+                test.handle_errors(test.parse())
+                    .map_err(|e| error::TopLevelError::from(e))?,
+                *result
+            );
+        })
     }
 }

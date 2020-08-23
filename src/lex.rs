@@ -1,42 +1,39 @@
-use crate::CompilationError;
+use crate::error::CompilationError;
 use logos::Logos;
 use std::fmt;
 use std::ops::Range;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
-#[logos(trivia = "[ \r\n\t]+")]
 pub enum Token<'a> {
+    #[regex("[ \r\n\t]+", logos::skip)]
     #[error]
     Error,
 
-    #[token = "\""]
-    Quote,
-
-    #[token = "true"]
+    #[token("true")]
     True,
 
-    #[token = "false"]
+    #[token("false")]
     False,
 
-    #[token = "null"]
+    #[token("null")]
     Null,
 
-    #[token = ":"]
+    #[token(":")]
     Colon,
 
-    #[token = ","]
+    #[token(",")]
     Comma,
 
-    #[token = "{"]
+    #[token("{")]
     LBrace,
 
-    #[token = "}"]
+    #[token("}")]
     RBrace,
 
-    #[token = "["]
+    #[token("[")]
     LBrack,
 
-    #[token = "]"]
+    #[token("]")]
     RBrack,
 
     /* The last 2 could use some cleaning up,
@@ -47,15 +44,18 @@ pub enum Token<'a> {
     #[regex(r#"-?([0-9]|([1-9][0-9]*))((\.[0-9]+)?)([eE][+-]?[0-9]+)?"#, |lex| lex.slice())]
     Number(&'a str),
 
-    #[regex(r#""([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))*""#, |lex| lex.slice())]
+    #[regex(r#""([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))*""#)]
     String(&'a str),
+    #[regex(r#""([ -!#-\[\]-\x{10ffff}]|([\\](["\\/bfnrt]|[u][[:xdigit:]][[:xdigit:]][[:xdigit:]][[:xdigit:]])))*"#)]
+    MissingEndQuote(&'a str),
 }
+
 impl<'a> Token<'a> {
     pub fn to_lalr_triple(
         (t, r): (Token<'a>, Range<usize>),
     ) -> Result<(usize, Token, usize), CompilationError> {
         if t == Token::Error {
-            Err(CompilationError::LexicalError { pos: r.start })
+            Err(CompilationError::LexicalError { range: r })
         } else {
             Ok((r.start, t, r.end))
         }
