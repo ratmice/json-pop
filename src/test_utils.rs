@@ -1,9 +1,5 @@
-use crate::parser;
-use crate::source;
-use crate::source::Parsable;
-
 #[cfg(test)]
-use crate::{error, source::ErrorHandling, value};
+use crate::{error, parser, source, source::Parsable as _, value};
 
 #[cfg(not(test))]
 use crate::never;
@@ -16,11 +12,13 @@ pub enum TestError<'a> {
 #[cfg(not(test))]
 pub type TestError<'a> = never::Never<'a>;
 
+#[cfg(test)]
 pub enum Test<'a> {
     TestValid(source::Source<'a>),
     TestInvalid(source::Source<'a>),
 }
 
+#[cfg(test)]
 impl<'a> Test<'a> {
     pub fn should_fail(&self) -> bool {
         match self {
@@ -30,7 +28,8 @@ impl<'a> Test<'a> {
     }
 }
 
-impl<'a> Parsable<'a> for Test<'a> {
+#[cfg(test)]
+impl<'a> source::Parsable<'a> for Test<'a> {
     fn parse(&'a self) -> parser::Parsed<'a> {
         match self {
             Test::TestValid(src) | Test::TestInvalid(src) => src.parse(),
@@ -45,7 +44,7 @@ impl<'a> Parsable<'a> for Test<'a> {
 }
 
 #[cfg(test)]
-impl<'a> ErrorHandling<'a> for Test<'a> {
+impl<'a> source::ErrorHandling<'a> for Test<'a> {
     #[cfg(not(feature = "pretty_errors"))]
     fn handle_errors(
         &'a self,
