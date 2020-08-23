@@ -7,9 +7,10 @@ cfg_if::cfg_if! {
   }
 }
 
-use json_pop::lex::wrap::Tokens;
+use json_pop::lex::Token;
 use json_pop::parser::jsonParser as parser;
 use json_pop::value;
+use logos::Logos;
 
 use std::io;
 use std::io::BufRead;
@@ -65,7 +66,7 @@ fn parse_stdin() -> anyhow::Result<()> {
     let mut handle = stdin.lock();
 
     handle.read_to_string(&mut buffer)?;
-    let tokens = Tokens::new(&buffer);
+    let tokens = Token::lexer(&buffer).spanned().map(Token::to_lalr_triple);
     let parsed = parser::new().parse(tokens);
     display_value_or_error(&buffer, parsed)
 }
@@ -77,8 +78,9 @@ fn parse_stdin_line() -> anyhow::Result<()> {
     let reader = io::BufReader::new(io::stdin());
     for input_line in reader.lines() {
         let input_line = input_line?;
-        // This is going to get the line number wrong,
-        let tokens = Tokens::new(&input_line.as_str());
+        let tokens = Token::lexer(&input_line.as_str())
+            .spanned()
+            .map(Token::to_lalr_triple);
         let parsed = parser::new().parse(tokens);
         if let Some(_) = display_value_or_error(&input_line, parsed).ok() {
             continue;
@@ -92,7 +94,7 @@ fn lex_stdin_lalr() -> anyhow::Result<()> {
     let reader = io::BufReader::new(io::stdin());
     for line in reader.lines() {
         let line = line?;
-        let tokens = Tokens::new(line.as_str());
+        let tokens = Token::lexer(line.as_str());
         for tok in tokens {
             println!("{:?}", tok);
         }
@@ -112,7 +114,7 @@ fn display_value_or_error(
                    let opts = Opts::from_args();
                    let writer = StandardStream::stderr(opts.color.into());
                    let config = codespan_reporting::term::Config::default();
-                   let (files, diagnostic) = json_pop::codespan::from_parse_error("stdin", &_source, &error);
+                   let (files, diagnostic) = json_pop::extra::codespan::from_parse_error("stdin", &_source, &error);
                   term::emit(&mut writer.lock(), &config, &files, &diagnostic)?;
               } else {
                   use std::io::Write;

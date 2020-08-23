@@ -1,23 +1,31 @@
-#[cfg(feature = "pretty_errors")]
-pub mod codespan;
+pub mod extra;
+pub mod error;
 pub mod lex;
+
+use crate::error::CompilationError;
+use crate::lex::Token;
+
+pub use lalrpop_util;
+use logos::Logos;
 
 pub mod parser {
     #![allow(clippy::all)]
-
     use lalrpop_util::lalrpop_mod;
     lalrpop_mod!(pub json);
+    use super::*;
     pub use json::*;
-    pub type ParseError<'a> =
-        lalrpop_util::ParseError<usize, crate::lex::wrap::Wrap<'a>, crate::lex::wrap::Error>;
+
+    pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, CompilationError>;
+    pub type ParseResult<'a> = Result<value::Value<'a>, ParseError<'a>>;
+    #[derive(Debug)]
+    pub struct Parsed<'a>(pub ParseResult<'a>);
 }
-pub use lalrpop_util;
 
 pub mod value {
     use lexical;
     use std::fmt;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Value<'a> {
         Number(f64),
         String(&'a str),
@@ -63,9 +71,9 @@ pub fn parse_str<'a>(
     bytes: &'a str,
 ) -> std::result::Result<
     value::Value<'a>,
-    lalrpop_util::ParseError<usize, lex::wrap::Wrap<'a>, lex::wrap::Error>,
+    lalrpop_util::ParseError<usize, Token<'a>, CompilationError>,
 > {
-    let lexer = lex::wrap::Tokens::new(bytes);
+    let lexer = Token::lexer(bytes).spanned().map(Token::to_lalr_triple);
     parser::jsonParser::new().parse(lexer)
 }
 
@@ -75,9 +83,47 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::extra::source;
+    use source::ErrorHandling as _;
+    use source::Parsable as _;
+    use crate::extra::test_utils::Test;
+
     #[test]
-    fn test() -> std::result::Result<(), anyhow::Error> {
-        let _ = crate::parse_str("�")?;
-        Ok(())
+    fn test_invalid() -> Result<(), error::TopLevelError> {
+        let sources = ["�", r#""string with missing end quote"#]
+            .iter()
+            .map(|src| Test::TestInvalid(src.into()));
+        Ok(for test in sources {
+            assert_eq!(
+                test.handle_errors(test.parse())
+                    .map_err(|e| error::TopLevelError::from(e))?,
+                crate::value::Value::Null
+            );
+        })
+    }
+
+    #[test]
+    fn test_valid() -> Result<(), error::TopLevelError> {
+        // The lifetimes here are kind of annoying in that we need to
+        // let bind these rather than just place them right in the array...
+        let empty_array = crate::value::Value::Array([].to_vec());
+        let string_value = crate::value::Value::String("foo");
+        let empty_string = crate::value::Value::String("");
+        let sources = [
+            ("[]", empty_array),
+            (r#""foo""#, string_value),
+            (r#""""#, empty_string),
+        ];
+        let tests = sources
+            .iter()
+            .map(|(src, result)| (Test::TestValid(src.into()), result));
+        Ok(for (test, result) in tests {
+            assert_eq!(
+                test.handle_errors(test.parse())
+                    .map_err(|e| error::TopLevelError::from(e))?,
+                *result
+            );
+        })
     }
 }
