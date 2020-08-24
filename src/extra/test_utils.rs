@@ -1,17 +1,23 @@
 #[cfg(test)]
-use crate::{error, parser, extra::source, extra::source::Parsable as _, value};
+use crate::{error, extra::source, extra::source::Parsable as _, parser, value};
+#[cfg(test)]
+use logos::Logos as _;
 
 #[cfg(not(test))]
 use crate::extra::never;
 
-#[derive(Debug)]
 #[cfg(test)]
+#[derive(Debug)]
 pub enum TestError<'a> {
     InvalidSourceParsedOk(value::Value<'a>, &'a source::Source<'a>),
 }
+
 #[cfg(not(test))]
 pub type TestError<'a> = never::Never<'a>;
 
+// TODO look at how much boiler plate is actually saved by doing this in one type...
+// The ErrorHandling implementation at least would be a lot clearer if these were
+// different types.
 #[cfg(test)]
 pub enum Test<'a> {
     TestValid(source::Source<'a>),
@@ -30,9 +36,18 @@ impl<'a> Test<'a> {
 
 #[cfg(test)]
 impl<'a> source::Parsable<'a> for Test<'a> {
-    fn parse(&'a self) -> parser::Parsed<'a> {
+    type SourceContext = Test<'a>;
+    fn parse(&'a self) -> parser::Parsed<'a, Self> {
         match self {
-            Test::TestValid(src) | Test::TestInvalid(src) => src.parse(),
+            Test::TestValid(src) | Test::TestInvalid(src) => {
+                let lexer = crate::lex::Token::lexer(src.as_ref())
+                    .spanned()
+                    .map(crate::lex::Token::to_lalr_triple);
+                parser::Parsed {
+                    source_ctxt: &self,
+                    parse_result: parser::jsonParser::new().parse(lexer),
+                }
+            }
         }
     }
 
@@ -44,49 +59,52 @@ impl<'a> source::Parsable<'a> for Test<'a> {
 }
 
 #[cfg(test)]
-impl<'a> source::ErrorHandling<'a> for Test<'a> {
+impl<'a> source::ErrorHandling<'a> for parser::Parsed<'a, Test<'a>> {
     #[cfg(not(feature = "pretty_errors"))]
-    fn handle_errors(
-        &'a self,
-        parsed: parser::Parsed<'a>,
-    ) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
-        match (parsed.0.is_err(), self.should_fail()) {
+    fn handle_errors(self) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
+        match (self.parse_result.is_err(), self.source_ctxt.should_fail()) {
             (true, true) => {
-                eprint!("{:#?}", parsed);
+                eprint!("{:#?}", self.parse_result);
                 return Ok(value::Value::Null);
             }
             (false, true) => Err(error::JsonPopError::TestError(
-                TestError::InvalidSourceParsedOk(parsed.0.unwrap(), self.source()),
+                TestError::InvalidSourceParsedOk(
+                    self.parse_result.unwrap(),
+                    self.source_ctxt.source(),
+                ),
             )),
-            (_, _) => Ok(parsed.0.map_err(error::JsonPopError::Parse)?),
+            (_, _) => Ok(self.parse_result.map_err(error::JsonPopError::Parse)?),
         }
     }
 
     #[cfg(feature = "pretty_errors")]
-    fn handle_errors(
-        &'a self,
-        parsed: parser::Parsed<'a>,
-    ) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
-        if let Err(error) = parsed.0 {
+    fn handle_errors(self) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
+        if let Err(error) = self.parse_result {
             let mut writer = codespan_reporting::term::termcolor::Buffer::no_color();
             let config = codespan_reporting::term::Config::default();
-            let (files, diagnostic) =
-                crate::extra::codespan::from_parse_error("stdin", self.source(), &error);
+            let (files, diagnostic) = crate::extra::codespan::from_parse_error(
+                "stdin",
+                self.source_ctxt.source(),
+                &error,
+            );
 
             let () = codespan_reporting::term::emit(&mut writer, &config, &files, &diagnostic)?;
             eprint!("{}", std::str::from_utf8(writer.as_slice()).unwrap());
-            if self.should_fail() {
+            if self.source_ctxt.should_fail() {
                 Ok(value::Value::Null)
             } else {
                 Err(crate::error::JsonPopError::Parse(error))
             }
         } else {
-            if self.should_fail() {
+            if self.source_ctxt.should_fail() {
                 return Err(error::JsonPopError::TestError(
-                    TestError::InvalidSourceParsedOk(parsed.0.unwrap(), self.source()),
+                    TestError::InvalidSourceParsedOk(
+                        self.parse_result.unwrap(),
+                        self.source_ctxt.source(),
+                    ),
                 ));
             }
-            parsed.0.map_err(crate::error::JsonPopError::Parse)
+            self.parse_result.map_err(crate::error::JsonPopError::Parse)
         }
     }
 }

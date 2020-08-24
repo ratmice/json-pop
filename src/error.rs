@@ -2,9 +2,11 @@ use crate::parser;
 use std::fmt;
 use std::ops::Range;
 
-/// This is the error type returned by the parser.
-/// It's bounded by the lifetime of the source string
-/// which was parsed
+/// This is the error type returned by the parser,
+/// bounded by the lifetime of the source string
+/// which was parsed.
+///
+/// Due to these lifetimes, such a result cannot escape main.
 #[derive(Debug)]
 pub enum JsonPopError<'a> {
     Parse(crate::parser::ParseError<'a>),
@@ -13,9 +15,9 @@ pub enum JsonPopError<'a> {
     TestError(crate::extra::test_utils::TestError<'a>),
 }
 
-/// A top level error returned by processes or tests..
-/// It's not bounded by the lifetime of the string being parsed. 
-/// we should add error codes to these.
+/// A top level error returned by processes or tests,
+/// unbounded by the lifetime of the string which was parsed.
+/// we should probably add error codes to these.
 ///
 /// That will be a breaking change.
 #[derive(Debug)]

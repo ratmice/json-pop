@@ -1,5 +1,5 @@
-pub mod extra;
 pub mod error;
+pub mod extra;
 pub mod lex;
 
 use crate::error::CompilationError;
@@ -17,8 +17,15 @@ pub mod parser {
 
     pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, CompilationError>;
     pub type ParseResult<'a> = Result<value::Value<'a>, ParseError<'a>>;
+
     #[derive(Debug)]
-    pub struct Parsed<'a>(pub ParseResult<'a>);
+    /// Parsed includes a source context which presumably implements some
+    /// behavior pertaining to parsing or error handling,
+    /// and a result from parsing.
+    pub struct Parsed<'a, T> {
+        pub source_ctxt: &'a T,
+        pub parse_result: ParseResult<'a>,
+    }
 }
 
 pub mod value {
@@ -85,9 +92,9 @@ pub fn stringify<'a, W: std::io::Write>(w: &mut W, v: &'a value::Value<'a>) -> s
 mod test {
     use super::*;
     use crate::extra::source;
+    use crate::extra::test_utils::Test;
     use source::ErrorHandling as _;
     use source::Parsable as _;
-    use crate::extra::test_utils::Test;
 
     #[test]
     fn test_invalid() -> Result<(), error::TopLevelError> {
@@ -96,7 +103,8 @@ mod test {
             .map(|src| Test::TestInvalid(src.into()));
         Ok(for test in sources {
             assert_eq!(
-                test.handle_errors(test.parse())
+                test.parse()
+                    .handle_errors()
                     .map_err(|e| error::TopLevelError::from(e))?,
                 crate::value::Value::Null
             );
@@ -105,22 +113,19 @@ mod test {
 
     #[test]
     fn test_valid() -> Result<(), error::TopLevelError> {
-        // The lifetimes here are kind of annoying in that we need to
-        // let bind these rather than just place them right in the array...
-        let empty_array = crate::value::Value::Array([].to_vec());
-        let string_value = crate::value::Value::String("foo bar");
-        let empty_string = crate::value::Value::String("");
+        use crate::value::Value;
         let sources = [
-            ("[]", empty_array),
-            (r#""foo bar""#, string_value),
-            (r#""""#, empty_string),
+            ("[]", Value::Array([].to_vec())),
+            (r#""foo bar""#, Value::String("foo bar")),
+            (r#""""#, Value::String("")),
         ];
         let tests = sources
             .iter()
             .map(|(src, result)| (Test::TestValid(src.into()), result));
         Ok(for (test, result) in tests {
             assert_eq!(
-                test.handle_errors(test.parse())
+                test.parse()
+                    .handle_errors()
                     .map_err(|e| error::TopLevelError::from(e))?,
                 *result
             );
