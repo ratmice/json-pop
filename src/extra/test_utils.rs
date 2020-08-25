@@ -37,13 +37,13 @@ impl<'a> Test<'a> {
 #[cfg(test)]
 impl<'a> source::Parsable<'a> for Test<'a> {
     type SourceContext = Test<'a>;
-    fn parse(&'a self) -> parser::Parsed<'a, Self> {
+    fn parse(&'a self) -> source::Parsed<'a, Self> {
         match self {
             Test::TestValid(src) | Test::TestInvalid(src) => {
                 let lexer = crate::lex::Token::lexer(src.as_ref())
                     .spanned()
                     .map(crate::lex::Token::to_lalr_triple);
-                parser::Parsed {
+                source::Parsed {
                     source_ctxt: &self,
                     parse_result: parser::jsonParser::new().parse(lexer),
                 }
@@ -59,7 +59,7 @@ impl<'a> source::Parsable<'a> for Test<'a> {
 }
 
 #[cfg(test)]
-impl<'a> source::ErrorHandling<'a> for parser::Parsed<'a, Test<'a>> {
+impl<'a> source::ErrorHandling<'a> for source::Parsed<'a, Test<'a>> {
     #[cfg(not(feature = "pretty_errors"))]
     fn handle_errors(self) -> Result<value::Value<'a>, error::JsonPopError<'a>> {
         match (self.parse_result.is_err(), self.source_ctxt.should_fail()) {

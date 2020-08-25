@@ -17,15 +17,6 @@ pub mod parser {
 
     pub type ParseError<'a> = lalrpop_util::ParseError<usize, Token<'a>, CompilationError>;
     pub type ParseResult<'a> = Result<value::Value<'a>, ParseError<'a>>;
-
-    #[derive(Debug)]
-    /// Parsed includes a source context which presumably implements some
-    /// behavior pertaining to parsing or error handling,
-    /// and a result from parsing.
-    pub struct Parsed<'a, T> {
-        pub source_ctxt: &'a T,
-        pub parse_result: ParseResult<'a>,
-    }
 }
 
 pub mod value {
