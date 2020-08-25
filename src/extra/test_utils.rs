@@ -13,7 +13,7 @@ pub enum TestError<'a> {
 }
 
 #[cfg(not(test))]
-pub type TestError<'a> = never::Never<'a>;
+pub type TestError<'a> = never::Never;
 
 // TODO look at how much boiler plate is actually saved by doing this in one type...
 // The ErrorHandling implementation at least would be a lot clearer if these were
