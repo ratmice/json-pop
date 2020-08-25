@@ -1,6 +1,3 @@
-pub use self::source::*;
-
-mod source {
     #[cfg(feature = "pretty_errors")]
     use crate::extra::codespan;
     use crate::{error, lex, parser, value};
@@ -65,4 +62,3 @@ mod source {
             &self.0
         }
     }
-}
